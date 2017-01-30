@@ -31,10 +31,6 @@ Puppet::Type.newtype(:concat_file) do
     self[:ensure] == :present
   end
 
-  newparam(:tag) do
-    desc "Tag reference to collect all concat_fragment's with the same tag"
-  end
-
   newparam(:path, :namevar => true) do
     desc "The output file"
 
@@ -67,7 +63,12 @@ Puppet::Type.newtype(:concat_file) do
 
   newparam(:backup) do
     desc "Controls the filebucketing behavior of the final file and see File type reference for its use."
-    defaultto 'puppet'
+
+    validate do |value|
+      unless [TrueClass, FalseClass, String].include?(value.class)
+        raise ArgumentError, 'Backup must be a Boolean or String'
+      end
+    end
   end
 
   newparam(:replace, :boolean => true, :parent => Puppet::Parameter::Boolean) do
@@ -77,6 +78,12 @@ Puppet::Type.newtype(:concat_file) do
 
   newparam(:validate_cmd) do
     desc "Validates file."
+
+    validate do |value|
+      unless value.is_a?(String)
+        raise ArgumentError, 'Validate_cmd must be a String'
+      end
+    end
   end
 
   newparam(:ensure_newline, :boolean => true, :parent => Puppet::Parameter::Boolean) do
@@ -85,28 +92,48 @@ Puppet::Type.newtype(:concat_file) do
   end
 
   # Inherit File parameters
-  newparam(:selinux_ignore_defaults) do
-  end
+  newparam(:selinux_ignore_defaults, :boolean => true, :parent => Puppet::Parameter::Boolean)
 
   newparam(:selrange) do
+    validate do |value|
+      raise ArgumentError, 'Selrange must be a String' unless value.is_a?(String)
+    end
   end
 
   newparam(:selrole) do
+    validate do |value|
+      raise ArgumentError, 'Selrole must be a String' unless value.is_a?(String)
+    end
   end
 
   newparam(:seltype) do
+    validate do |value|
+      raise ArgumentError, 'Seltype must be a String' unless value.is_a?(String)
+    end
   end
 
   newparam(:seluser) do
+    validate do |value|
+      raise ArgumentError, 'Seluser must be a String' unless value.is_a?(String)
+    end
   end
 
-  newparam(:show_diff) do
-  end
+  newparam(:show_diff, :boolean => true, :parent => Puppet::Parameter::Boolean)
   # End file parameters
 
   # Autorequire the file we are generating below
+  # Why is this necessary ?
   autorequire(:file) do
     [self[:path]]
+  end
+
+  def fragments
+    # Collect fragments that target this resource by title or path.
+    @fragments ||= catalog.resources.map do |resource|
+      if resource.is_a?(Puppet::Type::Concat_fragment) && (resource[:target] == title || resource[:target] == self[:path])
+        resource
+      end
+    end.compact
   end
 
   def should_content
@@ -114,11 +141,7 @@ Puppet::Type.newtype(:concat_file) do
     @generated_content = ""
     content_fragments = []
 
-    resources = catalog.resources.select do |r|
-      r.is_a?(Puppet::Type.type(:concat_fragment)) && r[:tag] == self[:tag]
-    end
-
-    resources.each do |r|
+    fragments.each do |r|
       content_fragments << ["#{r[:order]}___#{r[:name]}", fragment_content(r)]
     end
 

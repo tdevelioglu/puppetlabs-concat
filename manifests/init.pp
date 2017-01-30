@@ -101,7 +101,6 @@ define concat(
   validate_string($seltype)
   validate_string($seluser)
 
-  $safe_name            = regsubst($name, '[/:~\n\s\+\*\(\)@]', '_', 'G')
   $default_warn_message = "# This file is managed by Puppet. DO NOT EDIT.\n"
 
   case $warn {
@@ -121,7 +120,6 @@ define concat(
 
   if $ensure == 'present' {
     concat_file { $name:
-      tag                     => $safe_name,
       path                    => $path,
       owner                   => $owner,
       group                   => $group,
@@ -142,7 +140,6 @@ define concat(
     if $_append_header {
       concat_fragment { "${name}_header":
         target  => $name,
-        tag     => $safe_name,
         content => $warn_message,
         order   => '0',
       }
@@ -150,7 +147,6 @@ define concat(
   } else {
     concat_file { $name:
       ensure => $ensure,
-      tag    => $safe_name,
       path   => $path,
       backup => $backup,
     }
